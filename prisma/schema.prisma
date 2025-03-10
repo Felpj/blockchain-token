@@ -8,11 +8,11 @@ datasource db {
 }
 
 model User {
-  id              String    @id @default(uuid())
+  id              Int       @id @default(autoincrement())
   email           String    @unique
   password        String
   name            String?
-  whatsapp        String?
+  whatsapp        String
   invite          String
   birthDate       DateTime?
   address         String?
@@ -23,21 +23,41 @@ model User {
   updatedAt       DateTime  @updatedAt
 
   transactions    Transaction[]
+  wallet          Wallet?
 }
 
-model Transaction {
+model Wallet {
   id              String    @id @default(uuid())
-  userId          String
-  type            String    // PURCHASE, SEND, RECEIVE
-  amount          Float
-  tokenAmount     Float
-  status          String    // PENDING, COMPLETED, FAILED
-  walletAddress   String?
-  txHash          String?   @unique
+  address         String    @unique
+  privateKey      String    
+  balance         Float     @default(0)
+  userId          Int       @unique
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  transactions    Transaction[]
   user            User      @relation(fields: [userId], references: [id])
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  userId          Int               
+  type            TransactionType   
+  amount          Float
+  tokenAmount     Float
+  status          TransactionStatus   
+  toAddress       String            
+  fromAddress     String?           
+  pixCode         String?           
+  paymentId       String?           
+  txHash          String?           @unique
+  walletId        String?           
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  error           String?
+
+  user            User              @relation(fields: [userId], references: [id])
+  wallet          Wallet?           @relation(fields: [walletId], references: [id])
 }
 
 model Invite {
@@ -45,4 +65,17 @@ model Invite {
   code            String    @unique
   used            Boolean   @default(false)
   createdAt       DateTime  @default(now())
+}
+
+// Novos enums para melhor tipagem
+enum TransactionType {
+  PURCHASE
+  SEND
+  RECEIVE
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }

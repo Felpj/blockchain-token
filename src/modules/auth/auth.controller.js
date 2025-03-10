@@ -31,6 +31,28 @@ const authController = {
             console.error('Erro ao fazer login:', error);
             return res.status(401).json({ error: error.message });
         }
+    },
+
+    async completeRegistration(req, res) {
+        try {
+            const { name, birthDate, address, cpf } = req.body;
+
+            if (!name || !birthDate || !address || !cpf) {
+                return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
+            }
+
+            const user = await authService.completeRegistration(req.user.id, {
+                name,
+                birthDate,
+                address,
+                cpf
+            });
+
+            return res.json(user);
+        } catch (error) {
+            console.error('Erro ao completar cadastro:', error);
+            return res.status(400).json({ error: error.message });
+        }
     }
 };
 

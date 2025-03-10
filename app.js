@@ -3,6 +3,9 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 
 const authRoutes = require("./src/modules/auth/auth.routes");
+const inviteRoutes = require("./src/modules/invites/invites.routes");
+const transactionsRoutes = require("./src/modules/transactions/transactions.routes");
+const walletRoutes = require('./src/modules/wallet/wallet.routes');
 
 //require('./src/config/database');
 
@@ -13,8 +16,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/auth', authRoutes)
-
+app.use('/auth', authRoutes);
+app.use('/invites', inviteRoutes);
+app.use('/transactions', transactionsRoutes);
+app.use('/wallet', walletRoutes);
 
 
 // Rota básica para teste
