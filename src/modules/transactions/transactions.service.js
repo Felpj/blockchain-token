@@ -83,30 +83,41 @@ const transactionsService = {
         };
     },
 
-    async getTransactions(userId) {
+    async getTransactions(userId, page = 1, limit = 10) {
         try {
-            const transactions = await prisma.transaction.findMany({
+            // Buscar total de registros
+            const total = await prisma.transaction.count({
                 where: { 
                     userId,
-                    type: 'PURCHASE' // Filtrando apenas compras de HX1000
-                },
-                orderBy: {
-                    createdAt: 'desc' // Mais recentes primeiro
-                },
-                include: {
-                    wallet: true
+                    type: 'PURCHASE'
                 }
             });
 
-            return transactions.map(tx => {
-                // Formatar endereço para exibição (primeiros e últimos caracteres)
+            // Calcular skip para paginação
+            const skip = (page - 1) * limit;
+
+            const transactions = await prisma.transaction.findMany({
+                where: { 
+                    userId,
+                    type: 'PURCHASE'
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                },
+                include: {
+                    wallet: true
+                },
+                skip,
+                take: limit
+            });
+
+            const formattedTransactions = transactions.map(tx => {
                 const formatAddress = (address) => {
                     if (!address) return '';
                     address = address.startsWith('0x') ? address : `0x${address}`;
                     return `${address.slice(0, 6)}...${address.slice(-4)}`;
                 };
 
-                // Formatar data para o padrão brasileiro
                 const formatDate = (date) => {
                     return new Date(date).toLocaleDateString('pt-BR', {
                         day: '2-digit',
@@ -117,7 +128,6 @@ const transactionsService = {
                     });
                 };
 
-                // Formatar status para português
                 const formatStatus = (status) => {
                     const statusMap = {
                         'PENDING': 'Pendente',
@@ -133,7 +143,6 @@ const transactionsService = {
                     total: `R$ ${tx.amount.toFixed(2)}`,
                     data: formatDate(tx.createdAt),
                     status: formatStatus(tx.status),
-                    // Dados adicionais que podem ser úteis
                     detalhes: {
                         txHash: tx.txHash,
                         bscScanUrl: tx.txHash ? `https://testnet.bscscan.com/tx/${tx.txHash}` : null,
@@ -141,6 +150,16 @@ const transactionsService = {
                     }
                 };
             });
+
+            return {
+                transactions: formattedTransactions,
+                pagination: {
+                    total,
+                    pages: Math.ceil(total / limit),
+                    currentPage: page,
+                    limit
+                }
+            };
         } catch (error) {
             console.error('Erro ao buscar transações:', error);
             throw new Error('Erro ao buscar histórico de transações');
@@ -148,19 +167,34 @@ const transactionsService = {
     },
 
     async confirmTransaction(paymentId) {
+        console.log('Confirmando transação com paymentId:', paymentId);
+        
         const transaction = await this.findTransactionByPaymentId(paymentId);
         
         if (!transaction) {
+            console.log('Transação não encontrada para paymentId:', paymentId);
             throw new Error('Transação não encontrada');
         }
+
+        console.log('Transação encontrada para confirmar:', {
+            id: transaction.id,
+            paymentId: transaction.paymentId,
+            status: transaction.status
+        });
 
         try {
             // Enviar tokens usando o smart contract
             const txHash = await contractService.distributeTokens(
                 transaction.toAddress,
                 transaction.tokenAmount,
-                paymentId // Passando o paymentId como referência
+                paymentId
             );
+
+            console.log('Tokens distribuídos, atualizando transação:', {
+                id: transaction.id,
+                txHash,
+                status: 'COMPLETED'
+            });
 
             // Atualizar a transação com o hash
             const updatedTransaction = await prisma.transaction.update({
@@ -197,6 +231,83 @@ const transactionsService = {
                 paymentId: paymentId
             }
         });
+    },
+
+    async getTransactionById(userId, transactionId) {
+        console.log('Buscando transação:', {
+            userId,
+            transactionId,
+            type: 'Busca por ID'
+        });
+
+        // Primeiro tenta buscar por ID
+        let transaction = await prisma.transaction.findFirst({
+            where: {
+                id: transactionId,
+                userId
+            },
+            select: {
+                id: true,
+                status: true,
+                amount: true,
+                tokenAmount: true,
+                txHash: true,
+                paymentId: true,
+                qrCode: true,
+                paymentString: true,
+                paidAt: true,
+                createdAt: true
+            }
+        });
+
+        // Se não encontrou, tenta buscar por paymentId
+        if (!transaction) {
+            transaction = await prisma.transaction.findFirst({
+                where: {
+                    paymentId: transactionId,
+                    userId
+                },
+                select: {
+                    id: true,
+                    status: true,
+                    amount: true,
+                    tokenAmount: true,
+                    txHash: true,
+                    paymentId: true,
+                    qrCode: true,
+                    paymentString: true,
+                    paidAt: true,
+                    createdAt: true
+                }
+            });
+        }
+
+        if (!transaction) {
+            throw new Error('Transação não encontrada');
+        }
+
+        return transaction;
+    },
+
+    async checkTransactionStatus(transactionId) {
+        const transaction = await prisma.transaction.findUnique({
+            where: { id: transactionId },
+            select: {
+                status: true,
+                amount: true,
+                txHash: true
+            }
+        });
+
+        if (!transaction) {
+            throw new Error('Transação não encontrada');
+        }
+
+        return {
+            status: transaction.status,
+            amount: transaction.amount,
+            txHash: transaction.txHash
+        };
     }
 };
 

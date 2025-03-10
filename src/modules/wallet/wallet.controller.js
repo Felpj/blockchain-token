@@ -58,16 +58,23 @@ const walletController = {
     async getReceiveDetails(req, res) {
         try {
             const details = await walletService.getReceiveDetails(req.user.id);
-            return res.json({
-                success: true,
-                data: details
-            });
+            return res.json(details);
         } catch (error) {
             console.error('Erro ao buscar detalhes para recebimento:', error);
             return res.status(400).json({ 
-                success: false, 
                 error: error.message 
             });
+        }
+    },
+
+    async getReceiveQRCode(req, res) {
+        try {
+            const userId = req.user.id;
+            const result = await walletService.generateReceiveQRCode(userId);
+            res.json(result);
+        } catch (error) {
+            console.error('Erro ao gerar QR code:', error);
+            res.status(500).json({ error: error.message });
         }
     }
 };

@@ -4,8 +4,12 @@ const authMiddleware = require('../../middlewares/auth.middleware');
 
 const router = express.Router();
 
-router.get('/details', authMiddleware, walletController.getWalletDetails);
-router.post('/send', authMiddleware, walletController.sendTokens);
-router.get('/receive', authMiddleware, walletController.getReceiveDetails);
+// Aplicar middleware de autenticação em todas as rotas
+router.use(authMiddleware);
+
+// Rotas da carteira
+router.get('/details', walletController.getWalletDetails);
+router.post('/send', walletController.sendTokens);
+router.get('/receive-details', walletController.getReceiveDetails);
 
 module.exports = router; 

@@ -13,7 +13,14 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+// Configuração do CORS
+app.use(cors({
+  origin: ['http://localhost:8080', 'https://globally-picked-skylark.ngrok-free.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 app.use('/auth', authRoutes);

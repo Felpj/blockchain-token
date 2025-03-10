@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const ethers = require('ethers');
 const contractABI = require('../contract/contractABI.json');
 const QRCode = require('qrcode');
+const { PrismaClient } = require('@prisma/client');
 
 const CONTRACT_ADDRESS = '0x952b1bEF2a3d64c61531168E79194Ce11bC2e1bf';
 const BSC_TESTNET_RPC = 'https://data-seed-prebsc-1-s1.binance.org:8545/';
@@ -182,26 +183,56 @@ const walletService = {
     },
 
     async getReceiveDetails(userId) {
-        const wallet = await prisma.wallet.findUnique({
-            where: { userId }
-        });
+        try {
+            const wallet = await prisma.wallet.findUnique({
+                where: { userId }
+            });
 
-        if (!wallet) {
-            throw new Error('Carteira não encontrada');
+            if (!wallet) {
+                throw new Error('Carteira não encontrada');
+            }
+
+            const address = wallet.address.startsWith('0x') 
+                ? wallet.address 
+                : `0x${wallet.address}`;
+
+            // Gerar QR code
+            const qrCodeData = await QRCode.toDataURL(address);
+            const qrCode = qrCodeData.split(',')[1]; // Remove o prefixo data:image/png;base64,
+
+            return {
+                address,
+                qrCode,
+                explorerUrl: `https://testnet.bscscan.com/address/${address}`
+            };
+        } catch (error) {
+            console.error('Erro ao gerar QR code:', error);
+            throw error;
         }
+    },
 
-        const address = wallet.address.startsWith('0x') 
-            ? wallet.address 
-            : `0x${wallet.address}`;
+    async generateReceiveQRCode(userId) {
+        try {
+            // Busca a carteira do usuário
+            const wallet = await prisma.wallet.findUnique({
+                where: { userId }
+            });
 
-        // Gerar QR code
-        const qrCode = await QRCode.toDataURL(address);
+            if (!wallet) {
+                throw new Error('Carteira não encontrada');
+            }
 
-        return {
-            address,
-            qrCode,
-            explorerUrl: `https://testnet.bscscan.com/address/${address}`
-        };
+            // Gera o QR code do endereço
+            const qrCode = await QRCode.toDataURL(wallet.address);
+
+            return {
+                address: wallet.address,
+                qrCode: qrCode.split(',')[1] // Remove o prefixo data:image/png;base64,
+            };
+        } catch (error) {
+            console.error('Erro ao gerar QR code:', error);
+            throw error;
+        }
     }
 };
 
